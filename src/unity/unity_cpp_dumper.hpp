@@ -15,7 +15,7 @@ class UnityCppDumper
         std::vector<std::string> parameterNames;
         bool isGeneric = false;
     };
-    
+
     struct CachedData
     {
         std::unordered_map<UnityResolve::Class*, int> classFlagsCache;
@@ -29,7 +29,7 @@ class UnityCppDumper
         std::unordered_map<UnityResolve::Method*, bool> isGenericMethodCache;
         std::unordered_map<UnityResolve::Field*, bool> isLiteralFieldCache;
         std::unordered_map<UnityResolve::Class*, int32_t> classInstanceSizeCache;
-        
+
         std::unordered_map<std::string, std::string> sanitizedNameCache;
         std::unordered_map<std::string, std::string> typeMappingCache;
         std::unordered_map<std::string, GenericInfo> genericInfoCache;
@@ -37,11 +37,10 @@ class UnityCppDumper
         std::unordered_map<UnityResolve::Class*, std::unordered_map<std::string, int>> classMethodOverloadsCache;
         std::unordered_map<UnityResolve::Field*, std::string> literalValueCache;
         std::unordered_map<std::string, UnityResolve::Class*> classLookupCache;
-        
+
         std::regex invalidCharsRegex{R"([<>`,\s\[\]\.&\*\+\-\(\)\$])"};
         std::regex multiUnderscoreRegex{"_{2,}"};
-        
-        std::chrono::high_resolution_clock::time_point startTime;
+
         size_t totalClasses = 0;
         size_t totalFields = 0;
         size_t totalMethods = 0;
@@ -73,7 +72,6 @@ class UnityCppDumper
     inline static void* unity_mono_method_is_generic_ptr = nullptr;
     inline static void* mono_class_instance_size_ptr = nullptr;
 
-    
 
     static void initializeApiPointers()
     {
@@ -127,8 +125,6 @@ class UnityCppDumper
 
     static void buildClassAssemblyMapping()
     {
-        cache.startTime = std::chrono::high_resolution_clock::now();
-        
         classToAssemblyMap.clear();
         cache.classFlagsCache.clear();
         cache.fieldFlagsCache.clear();
@@ -155,26 +151,28 @@ class UnityCppDumper
             {
                 classToAssemblyMap[pClass] = pAssembly;
                 cache.assemblyNameCache[pClass] = pAssembly->name;
-                
+
                 std::string shortName = pClass->name;
-                std::string fullName = pClass->namespaze.empty() ? pClass->name : pClass->namespaze + "." + pClass->name;
+                std::string fullName = pClass->namespaze.empty()
+                                           ? pClass->name
+                                           : pClass->namespaze + "." + pClass->name;
                 cache.classLookupCache[shortName] = pClass;
                 cache.classLookupCache[fullName] = pClass;
-                
+
                 std::unordered_map<std::string, int> methodCounts;
                 for (const auto& pMethod : pClass->methods)
                 {
                     methodCounts[pMethod->name]++;
                 }
                 cache.classMethodOverloadsCache[pClass] = methodCounts;
-                
+
                 cache.totalClasses++;
                 cache.totalFields += pClass->fields.size();
                 cache.totalMethods += pClass->methods.size();
             }
         }
-        
-        LOG_INFO("Built cache for {} classes, {} fields, {} methods", 
+
+        LOG_INFO("Built cache for {} classes, {} fields, {} methods",
                  cache.totalClasses, cache.totalFields, cache.totalMethods);
     }
 
@@ -439,11 +437,11 @@ class UnityCppDumper
         }
         // Handle numeric and boolean literals
         else if (pField->type->name == "System.Int32" || pField->type->name == "System.UInt32" ||
-                 pField->type->name == "System.Int64" || pField->type->name == "System.UInt64" ||
-                 pField->type->name == "System.Int16" || pField->type->name == "System.UInt16" ||
-                 pField->type->name == "System.SByte" || pField->type->name == "System.Byte" ||
-                 pField->type->name == "System.Single" || pField->type->name == "System.Double" ||
-                 pField->type->name == "System.Boolean")
+            pField->type->name == "System.Int64" || pField->type->name == "System.UInt64" ||
+            pField->type->name == "System.Int16" || pField->type->name == "System.UInt16" ||
+            pField->type->name == "System.SByte" || pField->type->name == "System.Byte" ||
+            pField->type->name == "System.Single" || pField->type->name == "System.Double" ||
+            pField->type->name == "System.Boolean")
         {
             result = extractNumericLiteral(pField);
         }
@@ -529,7 +527,7 @@ class UnityCppDumper
                     result = sanitizeName(genericInfo.baseName) + "*";
                 }
             }
-            
+
             cache.typeMappingCache[cacheKey] = result;
             return result;
         }
@@ -608,7 +606,7 @@ class UnityCppDumper
         {
             UnityResolve::Class* pClass = classIt->second;
             std::string result;
-            
+
             if (isEnum(pClass))
             {
                 result = sanitizeName(pClass->name) + "_Enum";
@@ -621,7 +619,7 @@ class UnityCppDumper
             {
                 result = sanitizeName(pClass->name) + "*";
             }
-            
+
             cache.typeMappingCache[cacheKey] = result;
             return result;
         }
@@ -666,7 +664,7 @@ class UnityCppDumper
                 flags = static_cast<mono_class_get_flags_func>(mono_class_get_flags_ptr)(pClass->address);
             }
         }
-        
+
         cache.classFlagsCache[pClass] = flags;
         return flags;
     }
@@ -699,7 +697,7 @@ class UnityCppDumper
                 flags = static_cast<mono_field_get_flags_func>(mono_field_get_flags_ptr)(pField->address);
             }
         }
-        
+
         cache.fieldFlagsCache[pField] = flags;
         return flags;
     }
@@ -734,7 +732,7 @@ class UnityCppDumper
                 flags = static_cast<mono_method_get_flags_func>(mono_method_get_flags_ptr)(pMethod->address, &iflags);
             }
         }
-        
+
         cache.methodFlagsCache[pMethod] = flags;
         return flags;
     }
@@ -771,7 +769,7 @@ class UnityCppDumper
         {
             result = (pClass->parent == "System.Enum");
         }
-        
+
         cache.isEnumCache[pClass] = result;
         return result;
     }
@@ -808,7 +806,7 @@ class UnityCppDumper
         {
             result = (pClass->parent == "System.ValueType" || isEnum(pClass));
         }
-        
+
         cache.isValueTypeCache[pClass] = result;
         return result;
     }
@@ -843,7 +841,7 @@ class UnityCppDumper
             int flags = getClassFlags(pClass);
             result = (flags & TYPE_ATTRIBUTE_ABSTRACT) != 0;
         }
-        
+
         cache.isAbstractCache[pClass] = result;
         return result;
     }
@@ -878,7 +876,7 @@ class UnityCppDumper
             int flags = getClassFlags(pClass);
             result = (flags & TYPE_ATTRIBUTE_INTERFACE) != 0;
         }
-        
+
         cache.isInterfaceCache[pClass] = result;
         return result;
     }
@@ -915,7 +913,7 @@ class UnityCppDumper
         {
             result = (pClass->name.find("`") != std::string::npos);
         }
-        
+
         cache.isGenericClassCache[pClass] = result;
         return result;
     }
@@ -948,7 +946,7 @@ class UnityCppDumper
                     pMethod->address);
             }
         }
-        
+
         cache.isGenericMethodCache[pMethod] = result;
         return result;
     }
@@ -987,7 +985,7 @@ class UnityCppDumper
             int flags = getFieldFlags(pField);
             result = (flags & FIELD_ATTRIBUTE_LITERAL) != 0;
         }
-        
+
         cache.isLiteralFieldCache[pField] = result;
         return result;
     }
@@ -1020,7 +1018,7 @@ class UnityCppDumper
                 size = static_cast<mono_class_instance_size_func>(mono_class_instance_size_ptr)(pClass->address);
             }
         }
-        
+
         cache.classInstanceSizeCache[pClass] = size;
         return size;
     }
@@ -1127,14 +1125,14 @@ public:
     static void DumpToCppHeaders(const std::string& outputPath)
     {
         auto startTime = std::chrono::high_resolution_clock::now();
-        
+
         LOG_INFO("Starting dump...");
-        
+
         initializeApiPointers();
         buildClassAssemblyMapping();
 
         std::ofstream mainHeader(outputPath + "UnityClasses.hpp");
-        if (!mainHeader.is_open()) 
+        if (!mainHeader.is_open())
         {
             LOG_ERROR("Failed to create output file: {}", outputPath + "UnityClasses.hpp");
             return;
@@ -1150,7 +1148,7 @@ public:
 
         std::vector<UnityResolve::Class*> allClasses;
         allClasses.reserve(cache.totalClasses);
-        
+
         for (const auto& pAssembly : UnityResolve::assembly)
         {
             for (const auto& pClass : pAssembly->classes)
@@ -1213,10 +1211,10 @@ public:
 
         CreateMacrosHeader(outputPath + "UnityMacros.hpp");
         CreateHelperFunctions(outputPath + "UnityHelpers.hpp");
-        
+
         auto endTime = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-        
+
         LOG_INFO("Dump completed in {} ms", duration.count());
     }
 
@@ -1313,10 +1311,6 @@ private:
                 parentType.pop_back();
             }
             out << " : public " << parentType;
-        }
-        else if (!isInterfaceClass && pClass->parent == "System.Object")
-        {
-            out << " : public UnityResolve::UnityType::Object";
         }
 
         out << " {\n";
@@ -1471,10 +1465,6 @@ private:
                 parentClass.pop_back();
             }
             out << " : public " << parentClass;
-        }
-        else if (!isInterfaceClass && pClass->parent == "System.Object")
-        {
-            out << " : public UnityResolve::UnityType::Object";
         }
 
         out << " {\n";
@@ -2427,4 +2417,5 @@ namespace app {
 static void DumpToCppHeaders(const std::string& outputPath)
 {
     UnityCppDumper::DumpToCppHeaders(outputPath);
+    LOG_INFO("Output located in \"{}\"", outputPath);
 }
